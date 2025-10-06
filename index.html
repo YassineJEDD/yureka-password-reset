@@ -122,11 +122,20 @@
 
       let userEmail = '';
 
-      // Extract access token and email from URL
+      /// Extract access token and email from URL
       async function initializeResetFlow() {
+          // Check both hash params (#) and query params (?)
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const accessToken = hashParams.get('access_token');
-          const type = hashParams.get('type');
+          const queryParams = new URLSearchParams(window.location.search);
+          
+          // Try to get from hash first, then fallback to query params
+          const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          const type = hashParams.get('type') || queryParams.get('type');
+
+          console.log('Debug - URL:', window.location.href);
+          console.log('Debug - Access Token:', accessToken ? 'Found' : 'Not found');
+          console.log('Debug - Type:', type);
 
           if (type !== 'recovery') {
               document.getElementById('errorMessage').textContent = 
@@ -145,12 +154,13 @@
           // Set the session using the access token
           const { data, error } = await supabaseClient.auth.setSession({
               access_token: accessToken,
-              refresh_token: hashParams.get('refresh_token')
+              refresh_token: refreshToken
           });
 
           if (error) {
+              console.error('Session error:', error);
               document.getElementById('errorMessage').textContent = 
-                  'Session error. Please request a new reset link.';
+                  'Session error: ' + error.message + '. Please request a new reset link.';
               document.getElementById('resetButton').disabled = true;
               return;
           }
