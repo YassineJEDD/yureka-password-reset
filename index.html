@@ -112,109 +112,111 @@
         </div>
     </div>
 
-    <script>
-        // Initialize Supabase client
-        const supabaseUrl = 'https://auadwsffujnatsokygwf.supabase.co';
-        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1YWR3c2ZmdWpuYXRzb2t5Z3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTAzNTQsImV4cCI6MjA2OTYyNjM1NH0.tHDEN3ZJ3O4hgHkip0MRIdhO1PPtQxa_mKs4SBmJqag';
-        const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+  <script>
+      // Initialize Supabase client
+      const supabaseUrl = 'https://auadwsffujnatsokygwf.supabase.co';
+      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1YWR3c2ZmdWpuYXRzb2t5Z3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTAzNTQsImV4cCI6MjA2OTYyNjM1NH0.tHDEN3ZJ3O4hgHkip0MRIdhO1PPtQxa_mKs4SBmJqag';
+      
+      // FIXED: Renamed to supabaseClient to avoid naming conflict
+      const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-        let userEmail = '';
+      let userEmail = '';
 
-        // Extract access token and email from URL
-        async function initializeResetFlow() {
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = hashParams.get('access_token');
-            const type = hashParams.get('type');
+      // Extract access token and email from URL
+      async function initializeResetFlow() {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const type = hashParams.get('type');
 
-            if (type !== 'recovery') {
-                document.getElementById('errorMessage').textContent = 
-                    'Invalid reset link. Please request a new one.';
-                document.getElementById('resetButton').disabled = true;
-                return;
-            }
+          if (type !== 'recovery') {
+              document.getElementById('errorMessage').textContent = 
+                  'Invalid reset link. Please request a new one.';
+              document.getElementById('resetButton').disabled = true;
+              return;
+          }
 
-            if (!accessToken) {
-                document.getElementById('errorMessage').textContent = 
-                    'Invalid or expired reset link. Please request a new one.';
-                document.getElementById('resetButton').disabled = true;
-                return;
-            }
+          if (!accessToken) {
+              document.getElementById('errorMessage').textContent = 
+                  'Invalid or expired reset link. Please request a new one.';
+              document.getElementById('resetButton').disabled = true;
+              return;
+          }
 
-            // Set the session using the access token
-            const { data, error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: hashParams.get('refresh_token')
-            });
+          // Set the session using the access token
+          const { data, error } = await supabaseClient.auth.setSession({
+              access_token: accessToken,
+              refresh_token: hashParams.get('refresh_token')
+          });
 
-            if (error) {
-                document.getElementById('errorMessage').textContent = 
-                    'Session error. Please request a new reset link.';
-                document.getElementById('resetButton').disabled = true;
-                return;
-            }
+          if (error) {
+              document.getElementById('errorMessage').textContent = 
+                  'Session error. Please request a new reset link.';
+              document.getElementById('resetButton').disabled = true;
+              return;
+          }
 
-            // Get user email and display it
-            userEmail = data.user?.email || '';
-            if (userEmail) {
-                document.getElementById('emailDisplay').textContent = 
-                    `Resetting password for: ${userEmail}`;
-            }
-        }
+          // Get user email and display it
+          userEmail = data.user?.email || '';
+          if (userEmail) {
+              document.getElementById('emailDisplay').textContent = 
+                  `Resetting password for: ${userEmail}`;
+          }
+      }
 
-        // Handle password reset
-        async function handleResetPassword() {
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const errorDiv = document.getElementById('errorMessage');
-            const button = document.getElementById('resetButton');
+      // Handle password reset
+      async function handleResetPassword() {
+          const newPassword = document.getElementById('newPassword').value;
+          const confirmPassword = document.getElementById('confirmPassword').value;
+          const errorDiv = document.getElementById('errorMessage');
+          const button = document.getElementById('resetButton');
 
-            // Clear previous errors
-            errorDiv.textContent = '';
+          // Clear previous errors
+          errorDiv.textContent = '';
 
-            // Validation
-            if (!newPassword || !confirmPassword) {
-                errorDiv.textContent = 'Please fill in both password fields';
-                return;
-            }
+          // Validation
+          if (!newPassword || !confirmPassword) {
+              errorDiv.textContent = 'Please fill in both password fields';
+              return;
+          }
 
-            if (newPassword.length < 6) {
-                errorDiv.textContent = 'Password must be at least 6 characters';
-                return;
-            }
+          if (newPassword.length < 6) {
+              errorDiv.textContent = 'Password must be at least 6 characters';
+              return;
+          }
 
-            if (newPassword !== confirmPassword) {
-                errorDiv.textContent = 'Passwords do not match';
-                return;
-            }
+          if (newPassword !== confirmPassword) {
+              errorDiv.textContent = 'Passwords do not match';
+              return;
+          }
 
-            // Disable button and show loading
-            button.disabled = true;
-            button.textContent = 'Resetting...';
+          // Disable button and show loading
+          button.disabled = true;
+          button.textContent = 'Resetting...';
 
-            // Update password
-            const { error } = await supabase.auth.updateUser({
-                password: newPassword
-            });
+          // Update password
+          const { error } = await supabaseClient.auth.updateUser({
+              password: newPassword
+          });
 
-            if (error) {
-                errorDiv.textContent = error.message || 'Failed to reset password';
-                button.disabled = false;
-                button.textContent = 'Reset Password';
-                return;
-            }
+          if (error) {
+              errorDiv.textContent = error.message || 'Failed to reset password';
+              button.disabled = false;
+              button.textContent = 'Reset Password';
+              return;
+          }
 
-            // Success!
-            document.getElementById('resetForm').style.display = 'none';
-            document.getElementById('successMessage').style.display = 'block';
+          // Success!
+          document.getElementById('resetForm').style.display = 'none';
+          document.getElementById('successMessage').style.display = 'block';
 
-            // Sign out after successful reset
-            setTimeout(() => {
-                supabase.auth.signOut();
-            }, 1000);
-        }
+          // Sign out after successful reset
+          setTimeout(() => {
+              supabaseClient.auth.signOut();
+          }, 1000);
+      }
 
-        // Initialize on page load
-        initializeResetFlow();
-    </script>
+      // Initialize on page load
+      initializeResetFlow();
+  </script>
 </body>
 </html>
