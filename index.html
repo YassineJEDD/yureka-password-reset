@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yureka - Reset Password</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            font-family: 'VT323', monospace;
+        }
+        body {
+            font-family: 'VT323', monospace;
+            background: #000;
+            color: #DCFF9A;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: #1a1a1a;
+            border: 2px solid #7BB45E;
+            border-radius: 10px;
+            padding: 30px;
+        }
+        h1 {
+            color: #DCFF9A;
+            margin-bottom: 20px;
+        }
+        .email-display {
+            color: #999;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #2a2a2a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: #E6E3A9;
+            border: 3px solid #99A465;
+            border-radius: 12px;
+            color: #000;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #d4d197;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #FF4444;
+            margin: 10px 0;
+        }
+        .success {
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reset Your Password</h1>
+        <div id="emailDisplay" class="email-display"></div>
+        
+        <div id="resetForm">
+            <input 
+                type="password" 
+                id="newPassword" 
+                placeholder="New Password (min 6 characters)"
+                minlength="6"
+            />
+            <input 
+                type="password" 
+                id="confirmPassword" 
+                placeholder="Confirm New Password"
+            />
+            <div id="errorMessage" class="error"></div>
+            <button onclick="handleResetPassword()" id="resetButton">
+                Reset Password
+            </button>
+        </div>
+
+        <div id="successMessage" style="display: none;">
+            <div class="success">
+                <h2>✅ Password Reset Successful!</h2>
+                <p>You can now log in to Yureka with your new password.</p>
+                <p>You can close this window and return to the app.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        let userEmail = '';
+
+        // Extract access token and email from URL
+        async function initializeResetFlow() {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = hashParams.get('access_token');
+            const type = hashParams.get('type');
+
+            if (type !== 'recovery') {
+                document.getElementById('errorMessage').textContent = 
+                    'Invalid reset link. Please request a new one.';
+                document.getElementById('resetButton').disabled = true;
+                return;
+            }
+
+            if (!accessToken) {
+                document.getElementById('errorMessage').textContent = 
+                    'Invalid or expired reset link. Please request a new one.';
+                document.getElementById('resetButton').disabled = true;
+                return;
+            }
+
+            // Set the session using the access token
+            const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: hashParams.get('refresh_token')
+            });
+
+            if (error) {
+                document.getElementById('errorMessage').textContent = 
+                    'Session error. Please request a new reset link.';
+                document.getElementById('resetButton').disabled = true;
+                return;
+            }
+
+            // Get user email and display it
+            userEmail = data.user?.email || '';
+            if (userEmail) {
+                document.getElementById('emailDisplay').textContent = 
+                    `Resetting password for: ${userEmail}`;
+            }
+        }
+
+        // Handle password reset
+        async function handleResetPassword() {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const button = document.getElementById('resetButton');
+
+            // Clear previous errors
+            errorDiv.textContent = '';
+
+            // Validation
+            if (!newPassword || !confirmPassword) {
+                errorDiv.textContent = 'Please fill in both password fields';
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                return;
+            }
+
+            // Disable button and show loading
+            button.disabled = true;
+            button.textContent = 'Resetting...';
+
+            // Update password
+            const { error } = await supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (error) {
+                errorDiv.textContent = error.message || 'Failed to reset password';
+                button.disabled = false;
+                button.textContent = 'Reset Password';
+                return;
+            }
+
+            // Success!
+            document.getElementById('resetForm').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+
+            // Sign out after successful reset
+            setTimeout(() => {
+                supabase.auth.signOut();
+            }, 1000);
+        }
+
+        // Initialize on page load
+        initializeResetFlow();
+    </script>
+</body>
+</html>
