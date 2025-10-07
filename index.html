@@ -40,9 +40,14 @@
             margin-bottom: 20px;
             font-size: 14px;
         }
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
         input {
             width: 100%;
             padding: 15px;
+            padding-right: 60px;
             margin: 10px 0;
             background: #2a2a2a;
             border: 2px solid #333;
@@ -50,6 +55,23 @@
             color: #fff;
             font-size: 16px;
             box-sizing: border-box;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #7BB45E;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px 10px;
+            margin: 0;
+            width: auto;
+        }
+        .toggle-password:hover {
+            color: #DCFF9A;
         }
         button {
             width: 100%;
@@ -97,17 +119,29 @@
             <div id="emailDisplay" class="email-display"></div>
             
             <div id="resetForm">
-                <input 
-                    type="password" 
-                    id="newPassword" 
-                    placeholder="New Password (min 6 characters)"
-                    minlength="6"
-                />
-                <input 
-                    type="password" 
-                    id="confirmPassword" 
-                    placeholder="Confirm New Password"
-                />
+                <div class="password-wrapper">
+                    <input 
+                        type="password" 
+                        id="newPassword" 
+                        placeholder="New Password (min 6 characters)"
+                        minlength="6"
+                    />
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('newPassword')">
+                        Show
+                    </button>
+                </div>
+                
+                <div class="password-wrapper">
+                    <input 
+                        type="password" 
+                        id="confirmPassword" 
+                        placeholder="Confirm New Password"
+                    />
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirmPassword')">
+                        Show
+                    </button>
+                </div>
+                
                 <div id="errorMessage" class="error"></div>
                 <button onclick="handleResetPassword()" id="resetButton">
                     Reset Password
@@ -129,7 +163,6 @@
         const supabaseUrl = 'https://auadwsffujnatsokygwf.supabase.co';
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1YWR3c2ZmdWpuYXRzb2t5Z3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTAzNTQsImV4cCI6MjA2OTYyNjM1NH0.tHDEN3ZJ3O4hgHkip0MRIdhO1PPtQxa_mKs4SBmJqag';
         
-        // Initialize with PKCE disabled for this web context
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey, {
             auth: {
                 flowType: 'implicit',
@@ -139,23 +172,31 @@
 
         let userEmail = '';
 
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                button.textContent = 'Show';
+            }
+        }
+
         // Initialize reset flow
         async function initializeResetFlow() {
             console.log('Initializing reset flow...');
             
             try {
-                // Let Supabase automatically detect and handle the recovery session
-                // This happens during client initialization with detectSessionInUrl: true
-                
-                // Wait a bit for Supabase to process the URL
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // Get the current session
                 const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
                 
                 console.log('Session check:', session ? 'Session found' : 'No session', sessionError);
                 
-                // Hide loading
                 document.getElementById('loadingMessage').style.display = 'none';
                 document.getElementById('resetContainer').style.display = 'block';
                 
@@ -168,7 +209,6 @@
                 }
                 
                 if (!session) {
-                    // Try to get user another way
                     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                     
                     if (!user) {
@@ -183,7 +223,6 @@
                     userEmail = session.user?.email || '';
                 }
                 
-                // Display user email
                 if (userEmail) {
                     document.getElementById('emailDisplay').textContent = 
                         `Resetting password for: ${userEmail}`;
@@ -211,10 +250,8 @@
             const errorDiv = document.getElementById('errorMessage');
             const button = document.getElementById('resetButton');
 
-            // Clear previous errors
             errorDiv.textContent = '';
 
-            // Validation
             if (!newPassword || !confirmPassword) {
                 errorDiv.textContent = 'Please fill in both password fields';
                 return;
@@ -230,12 +267,10 @@
                 return;
             }
 
-            // Disable button and show loading
             button.disabled = true;
             button.textContent = 'Resetting...';
 
             try {
-                // Update password
                 const { data, error } = await supabaseClient.auth.updateUser({
                     password: newPassword
                 });
@@ -250,11 +285,9 @@
 
                 console.log('Password updated successfully');
 
-                // Success!
                 document.getElementById('resetForm').style.display = 'none';
                 document.getElementById('successMessage').style.display = 'block';
 
-                // Sign out after successful reset
                 setTimeout(async () => {
                     await supabaseClient.auth.signOut();
                     console.log('Signed out after password reset');
@@ -268,12 +301,10 @@
             }
         }
 
-        // Listen for auth state changes
         supabaseClient.auth.onAuthStateChange((event, session) => {
             console.log('Auth event:', event);
             if (event === 'PASSWORD_RECOVERY') {
                 console.log('Password recovery session detected');
-                // Session is ready for password reset
                 if (session?.user?.email) {
                     userEmail = session.user.email;
                     document.getElementById('emailDisplay').textContent = 
@@ -282,9 +313,7 @@
             }
         });
 
-        // Initialize on page load
         window.addEventListener('load', () => {
-            // Give Supabase time to process the URL parameters
             setTimeout(initializeResetFlow, 100);
         });
     </script>
