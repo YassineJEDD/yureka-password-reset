@@ -78,155 +78,238 @@
             color: #4CAF50;
             margin: 10px 0;
         }
+        .loading {
+            text-align: center;
+            padding: 40px 0;
+            color: #7BB45E;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Reset Your Password</h1>
-        <div id="emailDisplay" class="email-display"></div>
-        
-        <div id="resetForm">
-            <input 
-                type="password" 
-                id="newPassword" 
-                placeholder="New Password (min 6 characters)"
-                minlength="6"
-            />
-            <input 
-                type="password" 
-                id="confirmPassword" 
-                placeholder="Confirm New Password"
-            />
-            <div id="errorMessage" class="error"></div>
-            <button onclick="handleResetPassword()" id="resetButton">
-                Reset Password
-            </button>
+        <div id="loadingMessage" class="loading">
+            <h2>Loading...</h2>
+            <p>Verifying your reset link...</p>
         </div>
 
-        <div id="successMessage" style="display: none;">
-            <div class="success">
-                <h2>✅ Password Reset Successful!</h2>
-                <p>You can now log in to Yureka with your new password.</p>
-                <p>You can close this window and return to the app.</p>
+        <div id="resetContainer" style="display: none;">
+            <h1>Reset Your Password</h1>
+            <div id="emailDisplay" class="email-display"></div>
+            
+            <div id="resetForm">
+                <input 
+                    type="password" 
+                    id="newPassword" 
+                    placeholder="New Password (min 6 characters)"
+                    minlength="6"
+                />
+                <input 
+                    type="password" 
+                    id="confirmPassword" 
+                    placeholder="Confirm New Password"
+                />
+                <div id="errorMessage" class="error"></div>
+                <button onclick="handleResetPassword()" id="resetButton">
+                    Reset Password
+                </button>
+            </div>
+
+            <div id="successMessage" style="display: none;">
+                <div class="success">
+                    <h2>✅ Password Reset Successful!</h2>
+                    <p>You can now log in to Yureka with your new password.</p>
+                    <p>You can close this window and return to the app.</p>
+                </div>
             </div>
         </div>
     </div>
 
-  <script>
-      // Initialize Supabase client
-      const supabaseUrl = 'https://auadwsffujnatsokygwf.supabase.co';
-      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1YWR3c2ZmdWpuYXRzb2t5Z3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTAzNTQsImV4cCI6MjA2OTYyNjM1NH0.tHDEN3ZJ3O4hgHkip0MRIdhO1PPtQxa_mKs4SBmJqag';
-      
-      // FIXED: Renamed to supabaseClient to avoid naming conflict
-      const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://auadwsffujnatsokygwf.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1YWR3c2ZmdWpuYXRzb2t5Z3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNTAzNTQsImV4cCI6MjA2OTYyNjM1NH0.tHDEN3ZJ3O4hgHkip0MRIdhO1PPtQxa_mKs4SBmJqag';
+        
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-      let userEmail = '';
+        let userEmail = '';
 
-      /// Extract access token and email from URL
-      async function initializeResetFlow() {
-          // Check both hash params (#) and query params (?)
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const queryParams = new URLSearchParams(window.location.search);
-          
-          // Try to get from hash first, then fallback to query params
-          const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
-          const type = hashParams.get('type') || queryParams.get('type');
+        // Extract and exchange code for session
+        async function initializeResetFlow() {
+            console.log('Initializing reset flow...');
+            
+            // Hide loading, show error by default
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('resetContainer').style.display = 'block';
 
-          console.log('Debug - URL:', window.location.href);
-          console.log('Debug - Access Token:', accessToken ? 'Found' : 'Not found');
-          console.log('Debug - Type:', type);
+            try {
+                // Check both hash params (#) and query params (?)
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const queryParams = new URLSearchParams(window.location.search);
+                
+                // Try to get parameters from either location
+                let code = queryParams.get('code') || hashParams.get('code');
+                let accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+                let refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+                const type = hashParams.get('type') || queryParams.get('type');
+                const error = queryParams.get('error') || hashParams.get('error');
+                const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
 
-          if (type !== 'recovery') {
-              document.getElementById('errorMessage').textContent = 
-                  'Invalid reset link. Please request a new one.';
-              document.getElementById('resetButton').disabled = true;
-              return;
-          }
+                console.log('Debug - Full URL:', window.location.href);
+                console.log('Debug - Code:', code ? 'Found' : 'Not found');
+                console.log('Debug - Access Token:', accessToken ? 'Found' : 'Not found');
+                console.log('Debug - Type:', type);
+                console.log('Debug - Error:', error);
 
-          if (!accessToken) {
-              document.getElementById('errorMessage').textContent = 
-                  'Invalid or expired reset link. Please request a new one.';
-              document.getElementById('resetButton').disabled = true;
-              return;
-          }
+                // Check for error parameters
+                if (error) {
+                    document.getElementById('errorMessage').textContent = 
+                        errorDescription || 'Password reset failed. Please request a new link.';
+                    document.getElementById('resetButton').disabled = true;
+                    return;
+                }
 
-          // Set the session using the access token
-          const { data, error } = await supabaseClient.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-          });
+                let session = null;
 
-          if (error) {
-              console.error('Session error:', error);
-              document.getElementById('errorMessage').textContent = 
-                  'Session error: ' + error.message + '. Please request a new reset link.';
-              document.getElementById('resetButton').disabled = true;
-              return;
-          }
+                // Handle PKCE flow (code exchange)
+                if (code && !accessToken) {
+                    console.log('PKCE flow detected - exchanging code for session...');
+                    
+                    const { data, error: exchangeError } = await supabaseClient.auth.exchangeCodeForSession(code);
+                    
+                    if (exchangeError) {
+                        console.error('Code exchange error:', exchangeError);
+                        document.getElementById('errorMessage').textContent = 
+                            'Invalid or expired reset link. Please request a new one.';
+                        document.getElementById('resetButton').disabled = true;
+                        return;
+                    }
 
-          // Get user email and display it
-          userEmail = data.user?.email || '';
-          if (userEmail) {
-              document.getElementById('emailDisplay').textContent = 
-                  `Resetting password for: ${userEmail}`;
-          }
-      }
+                    if (data?.session) {
+                        session = data.session;
+                        console.log('Code exchanged successfully');
+                    }
+                }
+                // Handle direct token flow (fallback for older links)
+                else if (accessToken && refreshToken) {
+                    console.log('Direct token flow detected');
+                    
+                    if (type !== 'recovery') {
+                        document.getElementById('errorMessage').textContent = 
+                            'Invalid reset link type. Please request a new one.';
+                        document.getElementById('resetButton').disabled = true;
+                        return;
+                    }
 
-      // Handle password reset
-      async function handleResetPassword() {
-          const newPassword = document.getElementById('newPassword').value;
-          const confirmPassword = document.getElementById('confirmPassword').value;
-          const errorDiv = document.getElementById('errorMessage');
-          const button = document.getElementById('resetButton');
+                    const { data, error: sessionError } = await supabaseClient.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken
+                    });
 
-          // Clear previous errors
-          errorDiv.textContent = '';
+                    if (sessionError) {
+                        console.error('Session error:', sessionError);
+                        document.getElementById('errorMessage').textContent = 
+                            'Session error: ' + sessionError.message + '. Please request a new reset link.';
+                        document.getElementById('resetButton').disabled = true;
+                        return;
+                    }
 
-          // Validation
-          if (!newPassword || !confirmPassword) {
-              errorDiv.textContent = 'Please fill in both password fields';
-              return;
-          }
+                    session = data.session;
+                }
+                // No valid parameters found
+                else {
+                    document.getElementById('errorMessage').textContent = 
+                        'Invalid reset link format. Please request a new password reset.';
+                    document.getElementById('resetButton').disabled = true;
+                    return;
+                }
 
-          if (newPassword.length < 6) {
-              errorDiv.textContent = 'Password must be at least 6 characters';
-              return;
-          }
+                // Verify we have a valid session
+                if (!session || !session.user) {
+                    document.getElementById('errorMessage').textContent = 
+                        'Unable to verify reset link. Please request a new one.';
+                    document.getElementById('resetButton').disabled = true;
+                    return;
+                }
 
-          if (newPassword !== confirmPassword) {
-              errorDiv.textContent = 'Passwords do not match';
-              return;
-          }
+                // Display user email
+                userEmail = session.user.email || '';
+                if (userEmail) {
+                    document.getElementById('emailDisplay').textContent = 
+                        `Resetting password for: ${userEmail}`;
+                }
 
-          // Disable button and show loading
-          button.disabled = true;
-          button.textContent = 'Resetting...';
+                console.log('Reset flow initialized successfully');
 
-          // Update password
-          const { error } = await supabaseClient.auth.updateUser({
-              password: newPassword
-          });
+            } catch (err) {
+                console.error('Initialization error:', err);
+                document.getElementById('errorMessage').textContent = 
+                    'An error occurred. Please request a new reset link.';
+                document.getElementById('resetButton').disabled = true;
+            }
+        }
 
-          if (error) {
-              errorDiv.textContent = error.message || 'Failed to reset password';
-              button.disabled = false;
-              button.textContent = 'Reset Password';
-              return;
-          }
+        // Handle password reset
+        async function handleResetPassword() {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const button = document.getElementById('resetButton');
 
-          // Success!
-          document.getElementById('resetForm').style.display = 'none';
-          document.getElementById('successMessage').style.display = 'block';
+            // Clear previous errors
+            errorDiv.textContent = '';
 
-          // Sign out after successful reset
-          setTimeout(() => {
-              supabaseClient.auth.signOut();
-          }, 1000);
-      }
+            // Validation
+            if (!newPassword || !confirmPassword) {
+                errorDiv.textContent = 'Please fill in both password fields';
+                return;
+            }
 
-      // Initialize on page load
-      initializeResetFlow();
-  </script>
+            if (newPassword.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                return;
+            }
+
+            // Disable button and show loading
+            button.disabled = true;
+            button.textContent = 'Resetting...';
+
+            try {
+                // Update password
+                const { error } = await supabaseClient.auth.updateUser({
+                    password: newPassword
+                });
+
+                if (error) {
+                    errorDiv.textContent = error.message || 'Failed to reset password';
+                    button.disabled = false;
+                    button.textContent = 'Reset Password';
+                    return;
+                }
+
+                // Success!
+                document.getElementById('resetForm').style.display = 'none';
+                document.getElementById('successMessage').style.display = 'block';
+
+                // Sign out after successful reset
+                setTimeout(() => {
+                    supabaseClient.auth.signOut();
+                }, 1000);
+
+            } catch (err) {
+                console.error('Reset error:', err);
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                button.disabled = false;
+                button.textContent = 'Reset Password';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', initializeResetFlow);
+    </script>
 </body>
 </html>
